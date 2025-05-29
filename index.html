@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Interactive Piggy Bank</title>
+    <style>
+        body {
+            margin: 0;
+            height: 100vh;
+            overflow: hidden;
+            font-family: sans-serif;
+            background: black;
+        }
+
+        #counter {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            font-size: 24px;
+            background: white;
+            padding: 10px 20px;
+            border-radius: 12px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            z-index: 10;
+        }
+
+        #piggybank {
+            position: absolute;
+            left: 50%;
+            top: 60%;
+            transform: translate(-50%, -50%);
+            width: 250px;
+            height: 250px;
+            background: url('./img/img2.jpg') no-repeat center/contain;
+            z-index: 1;
+        }
+
+        .coin {
+            width: 60px;
+            height: 60px;
+            background: url('./img/img1.jpg') no-repeat center/contain;
+            position: absolute;
+            cursor: grab;
+            z-index: 2;
+            animation: rotateCoin 6s linear infinite;
+        }
+
+        @keyframes rotateCoin {
+            from {
+                transform: rotate(0deg);
+            }
+
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        #instructions {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: white;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 10px 20px;
+            border-radius: 12px;
+            text-align: center;
+            font-size: 16px;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="counter">💰 Coins: <span id="money-counter">0</span></div>
+    <div id="piggybank"></div>
+    <div id="instructions">Drag coins into the piggy bank to collect them!</div>
+
+    <audio id="coin-sound" src="./audio/audio.wav" preload="auto"></audio>
+
+    <script>
+        const piggybank = document.getElementById("piggybank");
+        const counter = document.getElementById("money-counter");
+        const sound = document.getElementById("coin-sound");
+        let totalCoins = 0;
+        let coinCount = 0;
+        const maxCoins = 30;
+
+        function createCoin() {
+            if (coinCount >= maxCoins) return;
+
+            const coin = document.createElement("div");
+            coin.classList.add("coin");
+            let x = Math.random() * (window.innerWidth - 60);
+            let y = Math.random() * (window.innerHeight - 60);
+            coin.style.left = x + "px";
+            coin.style.top = y + "px";
+            document.body.appendChild(coin);
+            coinCount++;
+
+            let dx = (Math.random() - 0.5) * 1.5;
+            let dy = (Math.random() - 0.5) * 1.5;
+            const speed = 0.5 + Math.random() * 1.5;
+
+            function animateCoin() {
+                if (!coin.isDragging) {
+                    x += dx * speed;
+                    y += dy * speed;
+
+                    if (x < 0 || x > window.innerWidth - 60) {
+                        dx = -dx * (0.8 + Math.random() * 0.4);
+                    }
+                    if (y < 0 || y > window.innerHeight - 60) {
+                        dy = -dy * (0.8 + Math.random() * 0.4);
+                    }
+
+                    coin.style.left = x + "px";
+                    coin.style.top = y + "px";
+                }
+                requestAnimationFrame(animateCoin);
+            }
+            animateCoin();
+
+            coin.onmousedown = function (e) {
+                coin.isDragging = true;
+                coin.style.cursor = 'grabbing';
+                const shiftX = e.clientX - coin.getBoundingClientRect().left;
+                const shiftY = e.clientY - coin.getBoundingClientRect().top;
+
+                function moveAt(pageX, pageY) {
+                    coin.style.left = pageX - shiftX + 'px';
+                    coin.style.top = pageY - shiftY + 'px';
+                }
+
+                function onMouseMove(e) {
+                    moveAt(e.pageX, e.pageY);
+                }
+
+                document.addEventListener('mousemove', onMouseMove);
+
+                coin.onmouseup = function () {
+                    document.removeEventListener('mousemove', onMouseMove);
+                    coin.onmouseup = null;
+                    coin.isDragging = false;
+                    coin.style.cursor = 'grab';
+
+                    const coinRect = coin.getBoundingClientRect();
+                    const bankRect = piggybank.getBoundingClientRect();
+
+                    if (
+                        coinRect.left < bankRect.right &&
+                        coinRect.right > bankRect.left &&
+                        coinRect.top < bankRect.bottom &&
+                        coinRect.bottom > bankRect.top
+                    ) {
+                        coin.style.transition = 'all 0.3s ease-out';
+                        coin.style.transform = 'scale(0)';
+                        setTimeout(() => {
+                            coin.remove();
+                            coinCount--;
+                        }, 300);
+
+                        totalCoins++;
+                        counter.innerText = totalCoins;
+                        sound.currentTime = 0;
+                        sound.play();
+
+                        piggybank.style.transform = 'translate(-50%, -50%) scale(1.1)';
+                        setTimeout(() => {
+                            piggybank.style.transform = 'translate(-50%, -50%)';
+                        }, 300);
+                    }
+                };
+            };
+
+            coin.ondragstart = function () {
+                return false;
+            };
+        }
+
+        for (let i = 0; i < 15; i++) {
+            setTimeout(() => createCoin(), i * 300);
+        }
+
+        setInterval(() => {
+            if (coinCount < maxCoins) {
+                createCoin();
+            }
+        }, 2000);
+
+        window.addEventListener('resize', () => {
+            const coins = document.querySelectorAll('.coin');
+            coins.forEach(coin => {
+                const x = parseFloat(coin.style.left);
+                const y = parseFloat(coin.style.top);
+                if (x > window.innerWidth - 60) coin.style.left = (window.innerWidth - 60) + 'px';
+                if (y > window.innerHeight - 60) coin.style.top = (window.innerHeight - 60) + 'px';
+            });
+        });
+    </script>
+</body>
+
+</html>
